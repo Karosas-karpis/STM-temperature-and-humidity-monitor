@@ -1,0 +1,17 @@
+10:20:00 **** Incremental Build of configuration Debug for project STM_Monitor ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F411xE -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STM_Monitor/Drivers/OLED/ssd1306" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STM_Monitor/Drivers/STM32F4xx_HAL_Driver/Inc" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STM_Monitor/Drivers/STM32F4xx_HAL_Driver/Src" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STMFSMmodel/src-gen" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STMFSMmodel/src" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STM_Monitor/Drivers/OLED" -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+arm-none-eabi-gcc -o "STM_Monitor.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Users\klima\Documents\GitHub\STM-temperature-and-humidity-monitor\STM_Monitor\STM32F411CEUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM_Monitor.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: STM_Monitor.elf
+ 
+arm-none-eabi-size  STM_Monitor.elf 
+arm-none-eabi-objdump -h -S STM_Monitor.elf  > "STM_Monitor.list"
+   text	   data	    bss	    dec	    hex	filename
+   9000	     12	   1796	  10808	   2a38	STM_Monitor.elf
+Finished building: default.size.stdout
+ 
+Finished building: STM_Monitor.list
+ 
+
+10:20:01 Build Finished. 0 errors, 0 warnings. (took 1s.24ms)
+

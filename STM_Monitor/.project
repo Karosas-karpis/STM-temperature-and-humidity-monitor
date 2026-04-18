@@ -35,5 +35,20 @@
 			<type>2</type>
 			<locationURI>PARENT-2-PROJECT_LOC/STMFSMmodel/src-gen</locationURI>
 		</link>
+		<link>
+			<name>Core/Src/Statechart.c</name>
+			<type>1</type>
+			<locationURI>WORKSPACE_LOC/STMFSMmodel/src-gen/Statechart.c</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/Statechart.h</name>
+			<type>1</type>
+			<locationURI>WORKSPACE_LOC/STMFSMmodel/src-gen/Statechart.h</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/Statechart_required.h</name>
+			<type>1</type>
+			<locationURI>WORKSPACE_LOC/STMFSMmodel/src-gen/Statechart_required.h</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

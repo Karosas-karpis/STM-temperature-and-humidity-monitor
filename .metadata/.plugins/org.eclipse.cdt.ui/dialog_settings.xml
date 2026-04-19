@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
-	<item key="org.eclipse.cdt.utils.ui.controls.FileListControl" value="${workspace_loc:/${ProjName}/FSM}"/>
+	<item key="org.eclipse.cdt.utils.ui.controls.FileListControl" value="C:\Users\klima\Documents\GitHub\STM-temperature-and-humidity-monitor\STMFSMmodel\src-gen"/>
 	<section name="completion_proposal_size">
 	</section>
 	<section name="org.eclipse.cdt.ui.text.hover.CMacroExpansionExploration">

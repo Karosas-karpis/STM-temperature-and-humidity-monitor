@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<item key="hasShownOverlayPopupBefore" value="true"/>
-	<item key="replaceBarOpen" value="false"/>
+	<item key="replaceBarOpen" value="true"/>
 	<list key="searchhistory">
-		<item value="HAL_TIM"/>
+		<item value="rcc"/>
+		<item value="rcs"/>
+		<item value="rsc"/>
 		<item value="HAL_TIM_PeriodElapsedCallback"/>
+		<item value="C:/Users/darbo"/>
+		<item value="HAL_TIM"/>
 		<item value="processdata"/>
 		<item value="process"/>
 	</list>

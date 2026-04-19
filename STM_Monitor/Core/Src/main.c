@@ -43,11 +43,11 @@
 
 #define SHT31_ADDR            (0x44 << 1)   // 7-bit addr 0x44, shifted for HAL
 static const uint8_t CMD_MEASURE_TEMP[]     = {0x2C, 0x06};  // high repeatability
-static const uint8_t CMD_MEASURE_HUMIDITY[] = {0x2C, 0x06};  // same cmd — SHT31 does both at once
 
 
 float temperature = 0.0f;
 float humidity = 0.0f;
+volatile uint8_t rtc_alarm_flag = 0;
 
 /* USER CODE END PD */
 
@@ -61,9 +61,11 @@ I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim11;
 
+UART_HandleTypeDef huart2;
+
 /* USER CODE BEGIN PV */
 
-volatile uint8_t rtc_alarm_flag = 1;
+//volatile uint8_t rtc_alarm_flag = 1;
 Statechart sc_handle;
 /* USER CODE END PV */
 
@@ -72,6 +74,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM11_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -79,38 +82,72 @@ static void MX_TIM11_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+
+void gosleep(Statechart* handle){
+
+
+}
+
+
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM11) {
-        rtc_alarm_flag = 1;
+    	//statechart_raise_ev_RTC_Alarm(&sc_handle);
+
+    	rtc_alarm_flag = 1;
     }
 
 }
 
+void SHT31_ReadTempHumidity(float* temp, float* humidity)
+{
+    uint8_t data[6];
+    uint16_t temp_raw, humidity_raw;
+
+    if (HAL_I2C_Master_Transmit(&hi2c1, SHT31_ADDR, (uint8_t *)CMD_MEASURE_TEMP, 2, 100) != HAL_OK) {
+        return;
+    }
+    //HAL_Delay(5);
+
+    if (HAL_I2C_Master_Receive(&hi2c1, SHT31_ADDR, data, 6, 100) != HAL_OK) {
+        return;
+    }
+
+    temp_raw     = (data[0] << 8) | data[1];
+    humidity_raw = (data[3] << 8) | data[4];
+
+    *temp = -45.0f + 175.0f * ((float)temp_raw / 65535.0f);
+    *humidity = 100.0f * ((float)humidity_raw / 65535.0f);
+}
+
+
 void statechart_goSleep( Statechart* handle)
 {
-//HAL_GPIO_WritePin(RGB_LD1_GPIO_Port,RGB_LD1_Pin,GPIO_PIN_SET);
+	//gosleep();
 }
 
 void statechart_readI2CSensor( Statechart* handle)
 {
-//HAL_GPIO_WritePin(RGB_LD1_GPIO_Port,RGB_LD1_Pin,GPIO_PIN_SET);
+
+    SHT31_ReadTempHumidity(&temperature, &humidity);
 }
 
-void statechart_displayInfo(float temp, float hum)
+void statechart_displayInfo(Statechart* handle)
 {
 
 	char buffer[20];
 	ssd1306_Fill(Black);
 
+
 	// Row 1: Temperature
-	ssd1306_SetCursor(0, 0);
-	snprintf(buffer, sizeof(buffer), "Temp: %.1f C", temp);
+	ssd1306_SetCursor(0, 5);
+	snprintf(buffer, sizeof(buffer), "Temp: %.1f C", temperature);
 	ssd1306_WriteString(buffer, Font_6x8, White);
 
 	// Row 2: Humidity
-	ssd1306_SetCursor(0, 10);
-	snprintf(buffer, sizeof(buffer), "Hum:  %.1f %%", hum);
+	ssd1306_SetCursor(0, 20);
+	snprintf(buffer, sizeof(buffer), "Hum:  %.1f %%", humidity);
 	ssd1306_WriteString(buffer, Font_6x8, White);
 
 	ssd1306_UpdateScreen();
@@ -123,26 +160,6 @@ void statechart_processData( Statechart* handle)
 }
 
 
-void SHT31_ReadTempHumidity(float* temp, float* humidity)
-{
-    uint8_t data[6];
-    uint16_t temp_raw, humidity_raw;
-
-    if (HAL_I2C_Master_Transmit(&hi2c1, SHT31_ADDR, (uint8_t *)CMD_MEASURE_TEMP, 2, 1000) != HAL_OK) {
-        return;
-    }
-    HAL_Delay(20);
-
-    if (HAL_I2C_Master_Receive(&hi2c1, SHT31_ADDR, data, 6, 1000) != HAL_OK) {
-        return;
-    }
-
-    temp_raw     = (data[0] << 8) | data[1];
-    humidity_raw = (data[3] << 8) | data[4];
-
-    *temp = -45.0f + 175.0f * ((float)temp_raw / 65535.0f);
-    *humidity = 100.0f * ((float)humidity_raw / 65535.0f);
-}
 
 
 /* USER CODE END 0 */
@@ -178,6 +195,7 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_TIM11_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
 
@@ -185,15 +203,43 @@ int main(void)
   statechart_enter(&sc_handle);
   HAL_TIM_Base_Start_IT(&htim11);
   ssd1306_Init();
+
+
+
+/*	char buffer[20];
+	ssd1306_Fill(Black);
+
+
+	// Row 1: Temperature
+	ssd1306_SetCursor(0, 5);
+	snprintf(buffer, sizeof(buffer), "Temp: %.1f C", temperature);
+	ssd1306_WriteString(buffer, Font_6x8, White);
+
+	// Row 2: Humidity
+	ssd1306_SetCursor(0, 20);
+	snprintf(buffer, sizeof(buffer), "Hum:  %.1f %%", humidity);
+	ssd1306_WriteString(buffer, Font_6x8, White);
+
+	ssd1306_UpdateScreen();*/
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		SHT31_ReadTempHumidity(&temperature, &humidity);
-		statechart_displayInfo(temperature, humidity);
-		HAL_Delay(1000);
+
+
+//		SHT31_ReadTempHumidity(&temperature, &humidity);
+//		statechart_displayInfo(temperature, humidity);
+//		HAL_Delay(1000);
+
+	  if (rtc_alarm_flag)
+	      {
+	          rtc_alarm_flag = 0;
+	          statechart_raise_ev_RTC_Alarm(&sc_handle);
+	      }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -218,10 +264,14 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 15;
+  RCC_OscInitStruct.PLL.PLLN = 96;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -231,12 +281,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -308,6 +358,39 @@ static void MX_TIM11_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -330,12 +413,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PH0 PH1 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PA0 PA1 PA4 PA5
                            PA6 PA7 PA8 PA9

@@ -1,0 +1,15 @@
+../Core/Src/main.c:77:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/main.c:85:13:SHT31_ReadTempHumidity	40	static
+../Core/Src/main.c:109:13:App_ProcessMeasurement	8	static
+../Core/Src/main.c:114:13:App_DisplayMeasurement	40	static
+../Core/Src/main.c:131:6:statechart_goSleep	16	static
+../Core/Src/main.c:136:6:statechart_readI2CSensor	16	static
+../Core/Src/main.c:142:6:statechart_processData	16	static
+../Core/Src/main.c:147:6:statechart_displayInfo	16	static
+../Core/Src/main.c:159:5:main	8	static
+../Core/Src/main.c:214:6:SystemClock_Config	88	static
+../Core/Src/main.c:260:13:MX_I2C1_Init	8	static
+../Core/Src/main.c:294:13:MX_TIM11_Init	8	static
+../Core/Src/main.c:325:13:MX_USART1_UART_Init	8	static
+../Core/Src/main.c:358:13:MX_GPIO_Init	24	static
+../Core/Src/main.c:382:6:Error_Handler	4	static,ignoring_inline_asm

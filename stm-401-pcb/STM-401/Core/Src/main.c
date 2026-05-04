@@ -36,7 +36,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SHT31_ADDR            (0x44U << 1)
-static const uint8_t CMD_MEASURE_TEMP[] = {0x2C, 0x06};
+static const uint8_t CMD_MEASURE_TEMP[] = {0x24, 0x00};
 
 /* USER CODE END PD */
 
@@ -55,6 +55,11 @@ UART_HandleTypeDef huart1;
 /* USER CODE BEGIN PV */
 static float temperature = 0.0f;
 static float humidity = 0.0f;
+static int16_t temperature_tenths = 0;
+static uint16_t humidity_tenths = 0U;
+static uint8_t sht31_ready = 0U;
+static uint8_t sht31_tx_ok = 0U;
+static uint8_t sht31_rx_ok = 0U;
 static volatile uint8_t rtc_alarm_flag = 0U;
 static Statechart sc_handle;
 /* USER CODE END PV */
@@ -66,7 +71,8 @@ static void MX_I2C1_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-static void SHT31_ReadTempHumidity(float *temp, float *hum);
+static uint8_t SHT31_IsReady(void);
+static uint8_t SHT31_ReadTempHumidity(void);
 static void App_ProcessMeasurement(void);
 static void App_DisplayMeasurement(void);
 
@@ -82,33 +88,58 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
 }
 
-static void SHT31_ReadTempHumidity(float *temp, float *hum)
+static uint8_t SHT31_IsReady(void)
+{
+  return (HAL_I2C_IsDeviceReady(&hi2c1, SHT31_ADDR, 3, 100) == HAL_OK) ? 1U : 0U;
+}
+
+static uint8_t SHT31_ReadTempHumidity(void)
 {
   uint8_t data[6];
   uint16_t temp_raw;
   uint16_t humidity_raw;
 
+  sht31_tx_ok = 0U;
+  sht31_rx_ok = 0U;
+
   if (HAL_I2C_Master_Transmit(&hi2c1, SHT31_ADDR, (uint8_t *)CMD_MEASURE_TEMP,
                               sizeof(CMD_MEASURE_TEMP), 100) != HAL_OK)
   {
-    return;
+    return 0U;
   }
+  sht31_tx_ok = 1U;
+
+  HAL_Delay(20);
 
   if (HAL_I2C_Master_Receive(&hi2c1, SHT31_ADDR, data, sizeof(data), 100) != HAL_OK)
   {
-    return;
+    return 0U;
   }
+  sht31_rx_ok = 1U;
 
   temp_raw = ((uint16_t)data[0] << 8) | data[1];
   humidity_raw = ((uint16_t)data[3] << 8) | data[4];
 
-  *temp = -45.0f + (175.0f * ((float)temp_raw / 65535.0f));
-  *hum = 100.0f * ((float)humidity_raw / 65535.0f);
+  temperature = -45.0f + (175.0f * ((float)temp_raw / 65535.0f));
+  humidity = 100.0f * ((float)humidity_raw / 65535.0f);
+  temperature_tenths = (int16_t)(-450L + (((1750L * temp_raw) + 32767L) / 65535L));
+  humidity_tenths = (uint16_t)(((1000UL * humidity_raw) + 32767UL) / 65535UL);
+
+  return 1U;
 }
 
 static void App_ProcessMeasurement(void)
 {
-  SHT31_ReadTempHumidity(&temperature, &humidity);
+  sht31_ready = SHT31_IsReady();
+  if (sht31_ready != 0U)
+  {
+    (void)SHT31_ReadTempHumidity();
+  }
+  else
+  {
+    sht31_tx_ok = 0U;
+    sht31_rx_ok = 0U;
+  }
 }
 
 static void App_DisplayMeasurement(void)
@@ -117,12 +148,16 @@ static void App_DisplayMeasurement(void)
 
   ssd1306_Fill(Black);
 
-  ssd1306_SetCursor(0, 5);
-  snprintf(buffer, sizeof(buffer), "Temp: %.1f C", temperature);
+  ssd1306_SetCursor(0, 11);
+  snprintf(buffer, sizeof(buffer), "Temp: %d.%d C",
+           temperature_tenths / 10,
+           (temperature_tenths < 0) ? -(temperature_tenths % 10) : (temperature_tenths % 10));
   ssd1306_WriteString(buffer, Font_6x8, White);
 
-  ssd1306_SetCursor(0, 20);
-  snprintf(buffer, sizeof(buffer), "Hum:  %.1f %%", humidity);
+  ssd1306_SetCursor(0, 22);
+  snprintf(buffer, sizeof(buffer), "Hum:  %u.%u %%",
+           humidity_tenths / 10U,
+           humidity_tenths % 10U);
   ssd1306_WriteString(buffer, Font_6x8, White);
 
   ssd1306_UpdateScreen();

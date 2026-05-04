@@ -1,6 +1,6 @@
 ################################################################################
 # Automatically-generated file. Do not edit!
-# Toolchain: GNU Tools for STM32 (14.3.rel1)
+# Toolchain: GNU Tools for STM32 (13.3.rel1)
 ################################################################################
 
 # Add inputs and outputs from these tool invocations to the build variables 
@@ -16,7 +16,7 @@ S_DEPS += \
 
 # Each subdirectory must supply rules for building sources it contributes
 Core/Startup/%.o: ../Core/Startup/%.s Core/Startup/subdir.mk
-	arm-none-eabi-gcc -mcpu=cortex-m4 -g3 -DDEBUG -c -I"C:/Users/klima/Documents/GitHub/stm-401-pcb/STM-401/Drivers/OLED/ssd1306" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STMFSMmodel/src" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STMFSMmodel/src-gen" -I"C:/Users/klima/Documents/GitHub/stm-401-pcb/STM-401/FSM" -I"C:/Users/klima/Documents/GitHub/stm-401-pcb/STM-401/Drivers/OLED" -x assembler-with-cpp -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "$@" "$<"
+	arm-none-eabi-gcc -mcpu=cortex-m4 -g3 -DDEBUG -c -I"C:/Users/darbo/Documents/GitHub/STM-temperature-and-humidity-monitor/stm-401-pcb/STM-401/Drivers/OLED/ssd1306" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STMFSMmodel/src" -I"C:/Users/klima/Documents/GitHub/STM-temperature-and-humidity-monitor/STMFSMmodel/src-gen" -I"C:/Users/darbo/Documents/GitHub/STM-temperature-and-humidity-monitor/stm-401-pcb/STM-401/FSM" -I"C:/Users/darbo/Documents/GitHub/STM-temperature-and-humidity-monitor/stm-401-pcb/STM-401/Drivers/OLED" -x assembler-with-cpp -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@"  -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "$@" "$<"
 
 clean: clean-Core-2f-Startup
 

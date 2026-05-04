@@ -1,6 +1,6 @@
 ################################################################################
 # Automatically-generated file. Do not edit!
-# Toolchain: GNU Tools for STM32 (14.3.rel1)
+# Toolchain: GNU Tools for STM32 (13.3.rel1)
 ################################################################################
 
 -include ../makefile.init
@@ -62,8 +62,8 @@ all: main-build
 main-build: STM-401.elf secondary-outputs
 
 # Tool invocations
-STM-401.elf STM-401.map: $(OBJS) $(USER_OBJS) C:\Users\klima\Documents\GitHub\stm-401-pcb\STM-401\STM32F401RBTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "STM-401.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\klima\Documents\GitHub\stm-401-pcb\STM-401\STM32F401RBTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM-401.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+STM-401.elf STM-401.map: $(OBJS) $(USER_OBJS) C:\Users\darbo\Documents\GitHub\STM-temperature-and-humidity-monitor\stm-401-pcb\STM-401\STM32F401RBTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "STM-401.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\darbo\Documents\GitHub\STM-temperature-and-humidity-monitor\stm-401-pcb\STM-401\STM32F401RBTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM-401.map" -Wl,--gc-sections -static  -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

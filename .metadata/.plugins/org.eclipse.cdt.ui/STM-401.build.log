@@ -1,10 +1,10 @@
-12:46:01 **** Incremental Build of configuration Debug for project STM-401 ****
-make -j8 all 
+08:24:04 **** Incremental Build of configuration Debug for project STM-401 ****
+make -j12 all 
 arm-none-eabi-size  STM-401.elf 
    text	   data	    bss	    dec	    hex	filename
-  41928	   1760	   3176	  46864	   b710	STM-401.elf
+  53936	   1732	   3204	  58872	   e5f8	STM-401.elf
 Finished building: default.size.stdout
  
 
-12:46:02 Build Finished. 0 errors, 0 warnings. (took 391ms)
+08:24:04 Build Finished. 0 errors, 0 warnings. (took 421ms)
 

@@ -48,18 +48,15 @@ static const uint8_t CMD_MEASURE_TEMP[] = {0x24, 0x00};
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+RTC_HandleTypeDef hrtc;
+
 TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static float temperature = 0.0f;
-static float humidity = 0.0f;
 static int16_t temperature_tenths = 0;
 static uint16_t humidity_tenths = 0U;
-static uint8_t sht31_ready = 0U;
-static uint8_t sht31_tx_ok = 0U;
-static uint8_t sht31_rx_ok = 0U;
 static volatile uint8_t rtc_alarm_flag = 0U;
 static Statechart sc_handle;
 /* USER CODE END PV */
@@ -70,22 +67,24 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 static uint8_t SHT31_IsReady(void);
 static uint8_t SHT31_ReadTempHumidity(void);
 static void App_ProcessMeasurement(void);
 static void App_DisplayMeasurement(void);
+static void App_UartTransmitString(const char *message);
+static void App_UartOutputMeasurement(void);
+static void EnterStopMode(void);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc)
 {
-  if (htim->Instance == TIM11)
-  {
-    rtc_alarm_flag = 1U;
-  }
+  (void)hrtc;
+  rtc_alarm_flag = 1U;
 }
 
 static uint8_t SHT31_IsReady(void)
@@ -99,15 +98,11 @@ static uint8_t SHT31_ReadTempHumidity(void)
   uint16_t temp_raw;
   uint16_t humidity_raw;
 
-  sht31_tx_ok = 0U;
-  sht31_rx_ok = 0U;
-
   if (HAL_I2C_Master_Transmit(&hi2c1, SHT31_ADDR, (uint8_t *)CMD_MEASURE_TEMP,
                               sizeof(CMD_MEASURE_TEMP), 100) != HAL_OK)
   {
     return 0U;
   }
-  sht31_tx_ok = 1U;
 
   HAL_Delay(20);
 
@@ -115,13 +110,10 @@ static uint8_t SHT31_ReadTempHumidity(void)
   {
     return 0U;
   }
-  sht31_rx_ok = 1U;
 
   temp_raw = ((uint16_t)data[0] << 8) | data[1];
   humidity_raw = ((uint16_t)data[3] << 8) | data[4];
 
-  temperature = -45.0f + (175.0f * ((float)temp_raw / 65535.0f));
-  humidity = 100.0f * ((float)humidity_raw / 65535.0f);
   temperature_tenths = (int16_t)(-450L + (((1750L * temp_raw) + 32767L) / 65535L));
   humidity_tenths = (uint16_t)(((1000UL * humidity_raw) + 32767UL) / 65535UL);
 
@@ -130,15 +122,53 @@ static uint8_t SHT31_ReadTempHumidity(void)
 
 static void App_ProcessMeasurement(void)
 {
-  sht31_ready = SHT31_IsReady();
-  if (sht31_ready != 0U)
+  if (SHT31_IsReady() != 0U)
   {
-    (void)SHT31_ReadTempHumidity();
+    if (SHT31_ReadTempHumidity() != 0U)
+    {
+      App_UartOutputMeasurement();
+    }
+    else
+    {
+      App_UartTransmitString("SHT31 read failed\r\n");
+    }
   }
   else
   {
-    sht31_tx_ok = 0U;
-    sht31_rx_ok = 0U;
+    App_UartTransmitString("SHT31 not ready\r\n");
+  }
+}
+
+static void App_UartTransmitString(const char *message)
+{
+  size_t length = 0U;
+
+  while (message[length] != '\0')
+  {
+    length++;
+  }
+
+  (void)HAL_UART_Transmit(&huart1, (uint8_t *)message, (uint16_t)length, 100);
+}
+
+static void App_UartOutputMeasurement(void)
+{
+  char buffer[48];
+  int length;
+
+  length = snprintf(buffer, sizeof(buffer), "Temperature: %d.%d C, Humidity: %u.%u %%\r\n",
+                    temperature_tenths / 10,
+                    (temperature_tenths < 0) ? -(temperature_tenths % 10) : (temperature_tenths % 10),
+                    humidity_tenths / 10U,
+                    humidity_tenths % 10U);
+
+  if (length > 0)
+  {
+    if (length >= (int)sizeof(buffer))
+    {
+      length = (int)sizeof(buffer) - 1;
+    }
+    (void)HAL_UART_Transmit(&huart1, (uint8_t *)buffer, (uint16_t)length, 100);
   }
 }
 
@@ -163,9 +193,21 @@ static void App_DisplayMeasurement(void)
   ssd1306_UpdateScreen();
 }
 
+static void EnterStopMode(void)
+{
+  HAL_SuspendTick();
+  HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+  HAL_ResumeTick();
+
+  SystemClock_Config();
+}
+
+
+
 void statechart_goSleep(Statechart *handle)
 {
   (void)handle;
+  EnterStopMode();
 }
 
 void statechart_readI2CSensor(Statechart *handle)
@@ -219,11 +261,12 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM11_Init();
   MX_USART1_UART_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  App_UartTransmitString("STM-401 UART ready\r\n");
+  ssd1306_Init();
   statechart_init(&sc_handle);
   statechart_enter(&sc_handle);
-  HAL_TIM_Base_Start_IT(&htim11);
-  ssd1306_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -254,17 +297,18 @@ void SystemClock_Config(void)
   /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 15;
-  RCC_OscInitStruct.PLL.PLLN = 96;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 80;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -318,6 +362,76 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* USER CODE BEGIN Check_RTC_BKUP */
+
+  /* USER CODE END Check_RTC_BKUP */
+
+  /** Initialize RTC and set the Time and Date
+  */
+  sTime.Hours = 0x0;
+  sTime.Minutes = 0x0;
+  sTime.Seconds = 0x0;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+  sDate.Month = RTC_MONTH_JANUARY;
+  sDate.Date = 0x1;
+  sDate.Year = 0x0;
+
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Enable the WakeUp
+  */
+  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 2, RTC_WAKEUPCLOCK_CK_SPRE_16BITS) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
 
 }
 

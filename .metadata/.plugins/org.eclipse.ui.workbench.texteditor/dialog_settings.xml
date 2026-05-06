@@ -3,6 +3,9 @@
 	<item key="hasShownOverlayPopupBefore" value="true"/>
 	<item key="replaceBarOpen" value="true"/>
 	<list key="searchhistory">
+		<item value="rtc"/>
+		<item value="SHT31_IsReady"/>
+		<item value="App_DisplayMeasurement"/>
 		<item value="rcc"/>
 		<item value="rcs"/>
 		<item value="rsc"/>
@@ -11,5 +14,8 @@
 		<item value="HAL_TIM"/>
 		<item value="processdata"/>
 		<item value="process"/>
+	</list>
+	<list key="replacehistory">
+		<item value="DisplayMeasurements"/>
 	</list>
 </section>

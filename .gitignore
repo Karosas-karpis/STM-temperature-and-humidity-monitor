@@ -1,0 +1,35 @@
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor and IDE workspace state
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Eclipse / STM32CubeIDE workspace metadata
+.metadata/
+*.pdom
+*.log
+
+# STM32CubeIDE generated build output
+**/Debug/
+**/Release/
+*.o
+*.d
+*.su
+*.cyclo
+*.elf
+*.bin
+*.hex
+*.list
+*.map
+
+# Local temporary files
+*.tmp
+*.temp
+*.bak
+*.orig

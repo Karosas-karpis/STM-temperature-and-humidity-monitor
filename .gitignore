@@ -12,6 +12,7 @@ Desktop.ini
 
 # Eclipse / STM32CubeIDE workspace metadata
 .metadata/
+**/.metadata/
 *.pdom
 *.log
 

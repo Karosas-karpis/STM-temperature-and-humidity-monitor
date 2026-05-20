@@ -7,6 +7,7 @@
 		<item key="WizardProjectsImportPage.STORE_CLOSE_CREATED_PROJECTS_ID" value="false"/>
 		<item key="WizardProjectsImportPage.STORE_HIDE_CONFLICTING_PROJECTS_ID" value="false"/>
 		<list key="WizardProjectsImportPage.STORE_DIRECTORIES">
+			<item value="C:\Users\klima\Documents\GitHub\STM-temperature-and-humidity-monitor\stm-401-pcb"/>
 			<item value="C:\Users\klima\Documents\GitHub\STM-temperature-and-humidity-monitor\STMFSMmodel"/>
 		</list>
 		<list key="WizardProjectsImportPage.STORE_ARCHIVES">
@@ -26,6 +27,7 @@
 		<item key="SmartImportRootWizardPage.STORE_NESTED_PROJECTS" value="true"/>
 		<item key="SmartImportRootWizardPage.STORE_CONFIGURE_NATURES" value="true"/>
 		<list key="org.eclipse.ui.internal.wizards.datatransfer.SmartImportRootWizardPage.knownSources">
+			<item value="C:\Users\klima\Documents\GitHub\STM-temperature-and-humidity-monitor\STM_Monitor"/>
 			<item value="C:\Users\klima\Documents\GitHub\STM-temperature-and-humidity-monitor\STMFSMmodel"/>
 			<item value="C:\Users\klima\OneDrive - Kaunas University of Technology\stm_sensor_temp_1\stmIdeCode\STM_Monitor\Core\FSM"/>
 		</list>

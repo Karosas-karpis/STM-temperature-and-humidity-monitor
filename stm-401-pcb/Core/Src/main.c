@@ -37,7 +37,6 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SHT31_ADDR (0x44 << 1)
-#define SHT31_READY_TRIES 3
 #define SHT31_I2C_TIMEOUT_MS 100
 #define SHT31_MEASUREMENT_DELAY_MS 20
 static const uint8_t CMD_MEASURE_TEMP[] = {0x24, 0x00};
@@ -45,38 +44,11 @@ static const uint8_t CMD_MEASURE_TEMP[] = {0x24, 0x00};
 #define SAMPLE_PERIOD_MS 500
 #define DISPLAY_AVERAGE_PERIOD_SECONDS 2
 #define AVERAGE_SAMPLE_COUNT ((DISPLAY_AVERAGE_PERIOD_SECONDS * 1000) / SAMPLE_PERIOD_MS)
-#define RTC_WAKEUP_CLOCK RTC_WAKEUPCLOCK_RTCCLK_DIV16
-#define RTC_WAKEUP_CLOCK_DIVIDER 16
-#define RTC_WAKEUP_CLOCK_HZ (LSI_VALUE / RTC_WAKEUP_CLOCK_DIVIDER)
-#define RTC_WAKEUP_COUNTER (((RTC_WAKEUP_CLOCK_HZ * SAMPLE_PERIOD_MS) / 1000) - 1)
 #define UART_BAUD_RATE 115200
 #define UART_TIMEOUT_MS 100
 
-#define DISPLAY_LEFT_COLUMN 0
-#define DISPLAY_TEMP_ROW 11
-#define DISPLAY_HUMIDITY_ROW 22
-#define DISPLAY_TEXT_BUFFER_SIZE 20
-#define UART_TEXT_BUFFER_SIZE 48
-
-#define SHT31_DATA_SIZE 6
-#define SHT31_TEMPERATURE_OFFSET_TENTHS -450
-#define SHT31_TEMPERATURE_SCALE_TENTHS 1750
-#define SHT31_HUMIDITY_SCALE_TENTHS 1000
-#define SHT31_CONVERSION_ROUNDING 32767
-#define SHT31_CONVERSION_MAX 65535
-
-#define TEMPERATURE_CALIBRATION 0
-#define HUMIDITY_CALIBRATION 0
-
-#define CALIBRATION_SCALE_TENTHS 10
-#define HUMIDITY_MIN_TENTHS 0
-#define HUMIDITY_MAX_TENTHS 1000
-
-#define TEMPERATURE_ALARM_TENTHS 350
-#define HUMIDITY_ALARM_TENTHS 800
-#define STARTUP_LED_TIME_MS 2000
-#define LED_OFF 0
-#define LED_ON 1
+#define TEMPERATURE_ALARM_C 30.0f
+#define HUMIDITY_ALARM_PERCENT 80.0f
 
 /* USER CODE END PD */
 
@@ -95,15 +67,16 @@ TIM_HandleTypeDef htim11;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static int16_t temperature_tenths = 0;
-static uint16_t humidity_tenths = 0;
-static int16_t average_temperature_tenths = 0;
-static uint16_t average_humidity_tenths = 0;
-static int32_t temperature_sum_tenths = 0;
-static uint32_t humidity_sum_tenths = 0;
+static float temperature = 0.0f;
+static float humidity = 0.0f;
+static float average_temperature = 0.0f;
+static float average_humidity = 0.0f;
+static float temperature_sum = 0.0f;
+static float humidity_sum = 0.0f;
 static uint8_t samples_in_average = 0;
 static uint8_t average_ready = 0;
 static volatile uint8_t rtc_alarm_flag = 0;
+static volatile uint8_t sleep_requested = 0;
 static Statechart sc_handle;
 /* USER CODE END PV */
 
@@ -115,17 +88,13 @@ static void MX_TIM11_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
-static uint8_t SHT31_IsReady(void);
 static uint8_t SHT31_ReadTempHumidity(void);
-static void ApplyCalibration(void);
 static void AddMeasurementToAverage(void);
-static int GetTemperatureDecimal(int16_t temperature);
 static void ProcessMeasurement(void);
 static void DisplayAverageMeasurement(void);
-static void UartTransmitString(const char *message);
-static void UartOutputMeasurement(void);
-static void SetLed(GPIO_TypeDef *port, uint16_t pin, uint8_t on);
-static void UpdateAlarmLed(void);
+static void SendUartText(const char *message);
+static void SendMeasurementOverUart(void);
+static void UpdateAlarmLeds(void);
 static void EnterStopMode(void);
 
 /* USER CODE END PFP */
@@ -134,28 +103,14 @@ static void EnterStopMode(void);
 /* USER CODE BEGIN 0 */
 void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc)
 {
-  (void)hrtc;
-  rtc_alarm_flag = 1;
-}
-
-static uint8_t SHT31_IsReady(void)
-{
-  if (HAL_I2C_IsDeviceReady(&hi2c1, SHT31_ADDR, SHT31_READY_TRIES,
-                            SHT31_I2C_TIMEOUT_MS) == HAL_OK)
-  {
-    return 1;
-  }
-
-  return 0;
+	rtc_alarm_flag = 1;
 }
 
 static uint8_t SHT31_ReadTempHumidity(void)
 {
-  uint8_t data[SHT31_DATA_SIZE];
-  uint16_t temp_raw;
-  uint16_t humidity_raw;
-  int32_t temperature_scaled;
-  int32_t humidity_scaled;
+  uint8_t data[6];
+  int temp_raw;
+  int humidity_raw;
 
   if (HAL_I2C_Master_Transmit(&hi2c1, SHT31_ADDR,
                               (uint8_t *)CMD_MEASURE_TEMP,
@@ -173,102 +128,57 @@ static uint8_t SHT31_ReadTempHumidity(void)
     return 0;
   }
 
-  temp_raw = ((uint16_t)data[0] << 8) | data[1];
-  humidity_raw = ((uint16_t)data[3] << 8) | data[4];
+  temp_raw = ((int)data[0] << 8) | data[1];
+  humidity_raw = ((int)data[3] << 8) | data[4];
 
-  temperature_scaled = (SHT31_TEMPERATURE_SCALE_TENTHS * (int32_t)temp_raw) +
-                       SHT31_CONVERSION_ROUNDING;
-  temperature_tenths = (int16_t)(SHT31_TEMPERATURE_OFFSET_TENTHS +
-                                 (temperature_scaled / SHT31_CONVERSION_MAX));
-
-  humidity_scaled = (SHT31_HUMIDITY_SCALE_TENTHS * (int32_t)humidity_raw) +
-                    SHT31_CONVERSION_ROUNDING;
-  humidity_tenths = (uint16_t)(humidity_scaled / SHT31_CONVERSION_MAX);
-
-  ApplyCalibration();
+  // From sht31 datasheet formula:
+  //temperature C = -45 + 175 * temp_raw / 65535
+  //humidity %    = 100 * humidity_raw / 65535
+  temperature = -45.0f + 175.0f * ((float)temp_raw / 65535.0f);
+  humidity = 100.0f * ((float)humidity_raw / 65535.0f);
 
   return 1;
 }
 
-static void ApplyCalibration(void)
-{
-  int32_t calibrated_humidity;
-
-  temperature_tenths = (int16_t)(temperature_tenths +
-                                 (TEMPERATURE_CALIBRATION * CALIBRATION_SCALE_TENTHS));
-
-  calibrated_humidity = (int32_t)humidity_tenths +
-                        (HUMIDITY_CALIBRATION * CALIBRATION_SCALE_TENTHS);
-
-  if (calibrated_humidity < HUMIDITY_MIN_TENTHS)
-  {
-    humidity_tenths = HUMIDITY_MIN_TENTHS;
-  }
-  else if (calibrated_humidity > HUMIDITY_MAX_TENTHS)
-  {
-    humidity_tenths = HUMIDITY_MAX_TENTHS;
-  }
-  else
-  {
-    humidity_tenths = (uint16_t)calibrated_humidity;
-  }
-}
-
 static void AddMeasurementToAverage(void)
 {
-  temperature_sum_tenths += temperature_tenths;
-  humidity_sum_tenths += humidity_tenths;
+  temperature_sum += temperature;
+  humidity_sum += humidity;
   samples_in_average++;
 
   if (samples_in_average >= AVERAGE_SAMPLE_COUNT)
   {
-    average_temperature_tenths = (int16_t)(temperature_sum_tenths / samples_in_average);
-    average_humidity_tenths = (uint16_t)(humidity_sum_tenths / samples_in_average);
+    average_temperature = temperature_sum / samples_in_average;
+    average_humidity = humidity_sum / samples_in_average;
 
-    temperature_sum_tenths = 0;
-    humidity_sum_tenths = 0;
+    temperature_sum = 0.0f;
+    humidity_sum = 0.0f;
     samples_in_average = 0;
     average_ready = 1;
   }
 }
 
-static int GetTemperatureDecimal(int16_t temperature)
-{
-  int decimal = temperature % 10;
-
-  if (decimal < 0)
-  {
-    decimal = -decimal;
-  }
-
-  return decimal;
-}
-
 static void ProcessMeasurement(void)
 {
-  SetLed(LED2_GPIO_Port, LED2_Pin, LED_ON);
+  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 
-  if (SHT31_IsReady() == 0)
+  if (SHT31_ReadTempHumidity() == 0)
   {
-    SetLed(LED3_GPIO_Port, LED3_Pin, LED_OFF);
-    UartTransmitString("SHT31 not ready\r\n");
-  }
-  else if (SHT31_ReadTempHumidity() == 0)
-  {
-    SetLed(LED3_GPIO_Port, LED3_Pin, LED_OFF);
-    UartTransmitString("SHT31 read failed\r\n");
+    HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
+    SendUartText("SHT31 read failed\r\n");
   }
   else
   {
-    UpdateAlarmLed();
-    UartOutputMeasurement();
+    UpdateAlarmLeds();
+    SendMeasurementOverUart();
     AddMeasurementToAverage();
   }
 
-  SetLed(LED2_GPIO_Port, LED2_Pin, LED_OFF);
+  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 }
 
-static void UartTransmitString(const char *message)
+static void SendUartText(const char *message)
 {
   size_t length = strlen(message);
 
@@ -276,22 +186,19 @@ static void UartTransmitString(const char *message)
                           UART_TIMEOUT_MS);
 }
 
-static void UartOutputMeasurement(void)
+static void SendMeasurementOverUart(void)
 {
-  char buffer[UART_TEXT_BUFFER_SIZE];
+  char buffer[48];
   int length;
 
-  length = snprintf(buffer, sizeof(buffer), "Temperature: %d.%d C, Humidity: %u.%u %%\r\n",
-                    temperature_tenths / 10,
-                    GetTemperatureDecimal(temperature_tenths),
-                    humidity_tenths / 10,
-                    humidity_tenths % 10);
-
+  length = snprintf(buffer, sizeof(buffer), "Temperature: %.1f C, Humidity: %.1f %%\r\n",
+                    temperature,
+                    humidity);
   if (length > 0)
   {
     if (length >= (int)sizeof(buffer))
     {
-      length = (int)sizeof(buffer) - 1;
+      length = (int)strlen(buffer);
     }
     (void)HAL_UART_Transmit(&huart1, (uint8_t *)buffer, (uint16_t)length,
                             UART_TIMEOUT_MS);
@@ -300,52 +207,42 @@ static void UartOutputMeasurement(void)
 
 static void DisplayAverageMeasurement(void)
 {
-  char buffer[DISPLAY_TEXT_BUFFER_SIZE];
+  char buffer[20];
 
   ssd1306_Fill(Black);
 
-  ssd1306_SetCursor(DISPLAY_LEFT_COLUMN, DISPLAY_TEMP_ROW);
-  snprintf(buffer, sizeof(buffer), "Temp: %d.%d C",
-           average_temperature_tenths / 10,
-           GetTemperatureDecimal(average_temperature_tenths));
+  ssd1306_SetCursor(0, 11);
+  snprintf(buffer, sizeof(buffer), "Temp: %.1f C",
+           average_temperature);
   ssd1306_WriteString(buffer, Font_6x8, White);
 
-  ssd1306_SetCursor(DISPLAY_LEFT_COLUMN, DISPLAY_HUMIDITY_ROW);
-  snprintf(buffer, sizeof(buffer), "Hum:  %u.%u %%",
-           average_humidity_tenths / 10,
-           average_humidity_tenths % 10);
+  ssd1306_SetCursor(0, 22);
+  snprintf(buffer, sizeof(buffer), "Hum:  %.1f %%",
+           average_humidity);
   ssd1306_WriteString(buffer, Font_6x8, White);
 
   ssd1306_UpdateScreen();
 }
 
-static void SetLed(GPIO_TypeDef *port, uint16_t pin, uint8_t on)
+static void UpdateAlarmLeds(void)
 {
-  GPIO_PinState pin_state;
-
-  if (on != 0)
+  if (humidity > HUMIDITY_ALARM_PERCENT)
   {
-    pin_state = GPIO_PIN_SET;
+    HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
   }
   else
   {
-    pin_state = GPIO_PIN_RESET;
+    HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
   }
 
-  HAL_GPIO_WritePin(port, pin, pin_state);
-}
-
-static void UpdateAlarmLed(void)
-{
-  uint8_t alarm_active = LED_OFF;
-
-  if ((temperature_tenths > TEMPERATURE_ALARM_TENTHS) ||
-      (humidity_tenths > HUMIDITY_ALARM_TENTHS))
+  if (temperature > TEMPERATURE_ALARM_C)
   {
-    alarm_active = LED_ON;
+    HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
   }
-
-  SetLed(LED3_GPIO_Port, LED3_Pin, alarm_active);
+  else
+  {
+    HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
+  }
 }
 
 static void EnterStopMode(void)
@@ -362,7 +259,7 @@ static void EnterStopMode(void)
 void statechart_goSleep(Statechart *handle)
 {
   (void)handle;
-  EnterStopMode();
+  sleep_requested = 1;
 }
 
 void statechart_readI2CSensor(Statechart *handle)
@@ -379,7 +276,12 @@ void statechart_processData(Statechart *handle)
 void statechart_displayInfo(Statechart *handle)
 {
   (void)handle;
-  DisplayAverageMeasurement();
+
+  if (average_ready != 0)
+  {
+    average_ready = 0;
+    DisplayAverageMeasurement();
+  }
 }
 
 /* USER CODE END 0 */
@@ -417,13 +319,12 @@ int main(void)
   MX_USART1_UART_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-  SetLed(LED1_GPIO_Port, LED1_Pin, LED_ON);
-  HAL_Delay(STARTUP_LED_TIME_MS);
-  SetLed(LED1_GPIO_Port, LED1_Pin, LED_OFF);
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 
-  UartTransmitString("STM-401 UART ready\r\n");
+  SendUartText("STM-401 UART ready\r\n");
   ssd1306_Init();
   statechart_init(&sc_handle);
+  statechart_enter(&sc_handle);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -436,17 +337,12 @@ int main(void)
     if (rtc_alarm_flag != 0)
     {
       rtc_alarm_flag = 0;
-      ProcessMeasurement();
-
-      if (average_ready != 0)
-      {
-        average_ready = 0;
-        DisplayAverageMeasurement();
-      }
+      statechart_raise_ev_RTC_Alarm(&sc_handle);
     }
 
-    if (rtc_alarm_flag == 0)
+    if ((sleep_requested != 0) && (rtc_alarm_flag == 0))
     {
+      sleep_requested = 0;
       EnterStopMode();
     }
   }
@@ -542,6 +438,7 @@ static void MX_RTC_Init(void)
 {
 
   /* USER CODE BEGIN RTC_Init 0 */
+  uint32_t wakeup_counter = (((LSI_VALUE / 16) * SAMPLE_PERIOD_MS) / 1000) - 1;
 
   /* USER CODE END RTC_Init 0 */
 
@@ -593,8 +490,8 @@ static void MX_RTC_Init(void)
 
   /** Enable the WakeUp
   */
-  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, RTC_WAKEUP_COUNTER,
-                                  RTC_WAKEUP_CLOCK) != HAL_OK)
+  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, wakeup_counter,
+                                  RTC_WAKEUPCLOCK_RTCCLK_DIV16) != HAL_OK)
   {
     Error_Handler();
   }

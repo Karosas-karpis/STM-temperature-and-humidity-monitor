@@ -1,2 +1,4 @@
 temperature
 humidity
+average_temperature_tenths
+average_humidity_tenths

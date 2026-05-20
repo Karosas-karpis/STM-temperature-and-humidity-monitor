@@ -1,4 +1,4 @@
-19:10:57 **** Incremental Build of configuration Debug for project STM_Monitor ****
+17:38:19 **** Incremental Build of configuration Debug for project STM_Monitor ****
 make -j12 all 
 arm-none-eabi-size  STM_Monitor.elf 
    text	   data	    bss	    dec	    hex	filename
@@ -6,5 +6,5 @@ arm-none-eabi-size  STM_Monitor.elf
 Finished building: default.size.stdout
  
 
-19:10:58 Build Finished. 0 errors, 0 warnings. (took 375ms)
+17:38:19 Build Finished. 0 errors, 0 warnings. (took 363ms)
 

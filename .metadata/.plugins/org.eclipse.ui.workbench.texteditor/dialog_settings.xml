@@ -3,6 +3,11 @@
 	<item key="hasShownOverlayPopupBefore" value="true"/>
 	<item key="replaceBarOpen" value="true"/>
 	<list key="searchhistory">
+		<item value="sleep_requested"/>
+		<item value="SendUartText"/>
+		<item value="TEMPERATURE_ALARM_TENTHS"/>
+		<item value="LED_on"/>
+		<item value="SetLed"/>
 		<item value="rtc"/>
 		<item value="SHT31_IsReady"/>
 		<item value="App_DisplayMeasurement"/>
@@ -13,7 +18,6 @@
 		<item value="C:/Users/darbo"/>
 		<item value="HAL_TIM"/>
 		<item value="processdata"/>
-		<item value="process"/>
 	</list>
 	<list key="replacehistory">
 		<item value="DisplayMeasurements"/>
